@@ -1,0 +1,6 @@
+*.pth
+*.pkl
+__pycache__/
+*.pyc
+.env
+CDT_Dataset/
