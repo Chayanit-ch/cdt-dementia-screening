@@ -5,7 +5,7 @@ for dementia screening using CCSS scoring standard.
 
 ## 🌐 Demo
 
-[Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://cdt-dementia-screening-as7vhbgavmfsmc9np9o5r7.streamlit.app/)
+[![Streamlit App]](https://cdt-dementia-screening-as7vhbgavmfsmc9np9o5r7.streamlit.app/)
 
 ## 📊 Results
 
