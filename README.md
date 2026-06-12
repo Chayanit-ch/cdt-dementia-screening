@@ -7,6 +7,11 @@ for dementia screening using CCSS scoring standard.
 
 [![Streamlit App]](https://cdt-dementia-screening-as7vhbgavmfsmc9np9o5r7.streamlit.app/)
 
+
+## Dataset
+NHATS Round 14 — not included
+Request access: [nhats.org](https://www.nhats.org/data-access/nhats)
+
 ## 📊 Results
 
 | Model | Sensitivity | Specificity | AUC |
