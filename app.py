@@ -4,21 +4,27 @@ import torch
 import torch.nn as nn
 import timm
 import numpy as np
-from PIL import Image, ImageOps, ImageFilter
+from PIL import Image, ImageEnhance
 from torchvision import transforms, models
 import os
 import gdown
+import json
 
-# ── Page Config ──
 st.set_page_config(
     page_title="CDT Dementia Screening",
     page_icon="🧠",
     layout="centered"
 )
 
-# ── Constants ──
-CUTOFF    = 6
-MODEL_URL = "https://drive.google.com/uc?id=YOUR_FILE_ID"
+CUTOFF = 6
+
+# FILE IDs
+MODEL_07L_URL = "https://drive.google.com/uc?id=17hHmRT0XT7RAK7yWNbEYiWTp4sDc_MbZ"
+MODEL_07R_URL = "https://drive.google.com/uc?id=1cTh__P48xT8DE0TY6au0I_-kjwyAVyMI"
+
+# Domain selection (from val set)
+# A=07l, B=07l, C=07r, D=07r, E=07r
+USE_07R = [False, False, True, True, True]
 
 domain_names = [
     "A: Digit Count",
@@ -35,7 +41,7 @@ domain_desc = {
     "E: Hands Placement"     : "เข็มชี้ถูกตำแหน่ง 11:10",
 }
 
-# ── Model ──
+# ── Model Definitions ──
 class CDTModel(nn.Module):
     def __init__(self, backbone_name="vit",
                  num_domains=5, num_classes=3):
@@ -47,9 +53,7 @@ class CDTModel(nn.Module):
             )
             self.feature_dim = 768
         else:
-            backbone = models.resnet50(
-                weights=None
-            )
+            backbone = models.resnet50(weights=None)
             self.feature_dim = 2048
             self.backbone = nn.Sequential(
                 *list(backbone.children())[:-1]
@@ -81,44 +85,119 @@ class CDTModel(nn.Module):
                     for h in self.heads_reg]
         return [h(feat) for h in self.heads_cls]
 
-# ── Load Model ──
+class CDTHybridModel(nn.Module):
+    def __init__(self, backbone_name="vit",
+                 vqa_dim=12, num_domains=5):
+        super().__init__()
+        if backbone_name == "vit":
+            self.backbone = timm.create_model(
+                "vit_base_patch16_224",
+                pretrained=False, num_classes=0
+            )
+            vis_dim = 768
+        else:
+            backbone = models.resnet50(weights=None)
+            self.backbone = nn.Sequential(
+                *list(backbone.children())[:-1]
+            )
+            vis_dim = 2048
+        self.backbone_name = backbone_name
+        self.vis_shared = nn.Sequential(
+            nn.Flatten(),
+            nn.Linear(vis_dim, 512),
+            nn.ReLU(), nn.Dropout(0.3)
+        )
+        self.vqa_encoder = nn.Sequential(
+            nn.Linear(vqa_dim, 64),
+            nn.ReLU(), nn.Dropout(0.2),
+            nn.Linear(64, 32), nn.ReLU()
+        )
+        self.fusion = nn.Sequential(
+            nn.Linear(512+32, 256),
+            nn.ReLU(), nn.Dropout(0.3)
+        )
+        self.heads_reg = nn.ModuleList([
+            nn.Linear(256, 1)
+            for _ in range(num_domains)
+        ])
+        self.heads_cls = nn.ModuleList([
+            nn.Linear(256, 3)
+            for _ in range(num_domains)
+        ])
+
+    def forward(self, img, vqa_feat=None,
+                mode="reg"):
+        if self.backbone_name == "vit":
+            vis = self.backbone(img)
+            vis = vis.unsqueeze(-1).unsqueeze(-1)
+        else:
+            vis = self.backbone(img)
+        vis = self.vis_shared(vis)
+        if vqa_feat is not None:
+            vqa   = self.vqa_encoder(vqa_feat)
+            fused = self.fusion(
+                torch.cat([vis, vqa], dim=1)
+            )
+        else:
+            fused = vis[:, :256]
+        if mode == "reg":
+            return [h(fused).squeeze(-1)
+                    for h in self.heads_reg]
+        return [h(fused) for h in self.heads_cls]
+
+# ── Load Models ──
 @st.cache_resource
-def load_model():
-    model_path = "model.pth"
-    if not os.path.exists(model_path):
+def load_models():
+    device = torch.device("cpu")
+
+    # โหลด 07l
+    if not os.path.exists("model_07l.pth"):
         with st.spinner(
-            "กำลังดาวน์โหลด model (~330MB)..."
+            "กำลังดาวน์โหลด Model 1/2..."
         ):
             gdown.download(
-                MODEL_URL, model_path, quiet=False
+                MODEL_07L_URL,
+                "model_07l.pth", quiet=False
             )
-    device = torch.device("cpu")
-    model  = CDTModel(backbone_name="vit").to(device)
-    model.load_state_dict(
-        torch.load(model_path, map_location=device)
+
+    # โหลด 07r
+    if not os.path.exists("model_07r.pth"):
+        with st.spinner(
+            "กำลังดาวน์โหลด Model 2/2..."
+        ):
+            gdown.download(
+                MODEL_07R_URL,
+                "model_07r.pth", quiet=False
+            )
+
+    model_07l = CDTHybridModel(
+        backbone_name="vit", vqa_dim=12
+    ).to(device)
+    model_07l.load_state_dict(
+        torch.load("model_07l.pth",
+                   map_location=device)
     )
-    model.eval()
-    return model, device
+    model_07l.eval()
+
+    model_07r = CDTModel(
+        backbone_name="vit"
+    ).to(device)
+    model_07r.load_state_dict(
+        torch.load("model_07r.pth",
+                   map_location=device)
+    )
+    model_07r.eval()
+
+    return model_07l, model_07r, device
 
 # ── Preprocess ──
 def preprocess(img):
-    """
-    แปลงรูปให้ใกล้เคียง CDT dataset
-    1. แปลง grayscale → RGB
-    2. เพิ่ม contrast
-    3. resize + normalize
-    """
-    # แปลงเป็น grayscale ก่อน
-    # เพราะ dataset เป็นรูปขาวดำ
     gray = img.convert("L")
-
-    # เพิ่ม contrast
     from PIL import ImageEnhance
-    gray = ImageEnhance.Contrast(gray).enhance(1.5)
-
-    # กลับเป็น RGB
+    gray     = ImageEnhance.Contrast(
+        gray
+    ).enhance(1.5)
     img_proc = gray.convert("RGB")
-
     transform = transforms.Compose([
         transforms.Resize((224, 224)),
         transforms.ToTensor(),
@@ -130,22 +209,33 @@ def preprocess(img):
     return transform(img_proc).unsqueeze(0)
 
 # ── Predict ──
-def predict(img, model, device):
+def predict(img, model_07l, model_07r, device):
     tensor = preprocess(img).to(device)
-    with torch.no_grad():
-        outputs = model(tensor, mode="cls")
 
     scores = []
-    probs  = []
-    for output in outputs:
-        prob  = torch.softmax(output, dim=1)[0]
-        score = prob.argmax().item()
+    with torch.no_grad():
+        # 07l predict A, B (index 0,1)
+        out_07l = model_07l(tensor, mode="reg")
+        # 07r predict C, D, E (index 2,3,4)
+        out_07r = model_07r(tensor, mode="cls")
+
+    for i in range(5):
+        if USE_07R[i]:
+            # จาก 07r
+            prob  = torch.softmax(
+                out_07r[i], dim=1
+            )[0]
+            score = prob.argmax().item()
+        else:
+            # จาก 07l
+            score = int(
+                out_07l[i].round().clamp(0,2).item()
+            )
         scores.append(score)
-        probs.append(prob.cpu().numpy())
 
     total       = sum(scores)
     is_dementia = total < CUTOFF
-    return scores, probs, total, is_dementia
+    return scores, total, is_dementia
 
 st.title("🧠 CDT Dementia Screening")
 st.markdown(
@@ -154,24 +244,21 @@ st.markdown(
 )
 
 st.warning(
-    "⚠️ ระบบนี้เป็นเพียง **screening tool** เท่านั้น "
-    "ไม่ใช่การวินิจฉัยทางการแพทย์ "
-    "ควรปรึกษาแพทย์ผู้เชี่ยวชาญเสมอ"
+    "ระบบนี้เป็นเพียง **screening tool** "
+    "ไม่ใช่การวินิจฉัยทางการแพทย์"
 )
 
-# ── คำแนะนำวาดรูป ──
 with st.expander("📋 วิธีวาด Clock Drawing Test"):
     st.markdown("""
     1. **วาดวงกลม** เป็นหน้าปัดนาฬิกา
     2. **ใส่ตัวเลข 1-12** ให้ครบและถูกตำแหน่ง
-    3. **วาดเข็มนาฬิกา 2 เข็ม** ชี้ที่ **11:10**
-       - เข็มสั้น (ชั่วโมง) → ชี้ที่เลข **11**
-       - เข็มยาว (นาที) → ชี้ที่เลข **2**
+    3. **วาดเข็ม 2 เข็ม** ชี้ที่ **11:10**
+       - เข็มสั้น (ชั่วโมง) → ชี้เลข **11**
+       - เข็มยาว (นาที) → ชี้เลข **2**
     """)
 
 st.divider()
 
-# ── Input Mode ──
 mode = st.radio(
     "เลือกวิธีใส่รูป",
     ["📁 Upload รูป", "✏️ วาดรูป"],
@@ -182,8 +269,8 @@ img = None
 
 if mode == "📁 Upload รูป":
     uploaded = st.file_uploader(
-        "อัปโหลดรูป Clock Drawing Test",
-        type=["jpg", "jpeg", "png", "tif"],
+        "อัปโหลดรูป CDT",
+        type=["jpg","jpeg","png","tif"],
     )
     if uploaded:
         img = Image.open(uploaded).convert("RGB")
@@ -192,75 +279,59 @@ if mode == "📁 Upload รูป":
 
 else:
     try:
-        from streamlit_drawable_canvas import st_canvas
-
-        col1, col2 = st.columns([3, 1])
+        from streamlit_drawable_canvas import (
+            st_canvas
+        )
+        col1, col2 = st.columns([3,1])
         with col1:
-            st.markdown("**วาดรูปนาฬิกาในกล่องด้านล่าง**")
+            st.markdown("**วาดรูปนาฬิกาด้านล่าง**")
         with col2:
-            stroke_width = st.slider(
-                "ขนาดปากกา", 1, 8, 3
-            )
+            stroke = st.slider("ขนาดปากกา",1,8,3)
 
         canvas = st_canvas(
             fill_color       = "rgba(255,255,255,1)",
-            stroke_width     = stroke_width,
+            stroke_width     = stroke,
             stroke_color     = "#000000",
             background_color = "#FFFFFF",
-            width  = 400,
-            height = 400,
-            drawing_mode = "freedraw",
-            key = "canvas",
+            width=400, height=400,
+            drawing_mode="freedraw",
+            key="canvas",
         )
-
-        col1, col2 = st.columns(2)
-        with col2:
-            if st.button("ล้างกระดาน"):
-                st.rerun()
-
         if (canvas.image_data is not None and
-                canvas.image_data[:,:,3].sum() > 1000):
+                canvas.image_data[:,:,3].sum()>1000):
             img = Image.fromarray(
                 canvas.image_data.astype("uint8"),
                 "RGBA"
             ).convert("RGB")
             st.caption("พร้อมวิเคราะห์แล้ว")
-
     except ImportError:
-        st.error(
-            "ไม่พบ streamlit-drawable-canvas "
-            "กรุณา upload รูปแทน"
-        )
+        st.error("กรุณา upload รูปแทน")
 
-# ── Analyze Button ──
 if img is not None:
     st.divider()
-
     if st.button(
         "🔍 วิเคราะห์", type="primary",
         use_container_width=True
     ):
-        with st.spinner("กำลังวิเคราะห์รูป..."):
-            model, device = load_model()
-            scores, probs, total, is_dementia =                 predict(img, model, device)
+        with st.spinner("กำลังวิเคราะห์..."):
+            model_07l, model_07r, device =                 load_models()
+            scores, total, is_dementia = predict(
+                img, model_07l, model_07r, device
+            )
 
-        # ── แสดงรูปที่ process แล้ว ──
-        with st.expander("รูปที่ใช้วิเคราะห์"):
-            gray = img.convert("L")
-            from PIL import ImageEnhance
+        with st.expander("🖼️ รูปที่ใช้วิเคราะห์"):
             gray = ImageEnhance.Contrast(
-                gray
+                img.convert("L")
             ).enhance(1.5)
             st.image(
                 gray.convert("RGB"),
-                caption="รูปหลัง preprocessing",
+                caption="หลัง preprocessing",
                 width=250
             )
 
         st.divider()
         st.subheader("📊 ผลการวิเคราะห์")
 
-        # ── Overall Result ──
         col1, col2, col3 = st.columns(3)
         with col1:
             st.metric("คะแนนรวม", f"{total}/10")
@@ -272,31 +343,20 @@ if img is not None:
             else:
                 st.success("🟢 ปกติ")
 
-        # ── Score Bar ──
         st.progress(total / 10)
-        st.caption(
-            f"คะแนน {total}/10 "
-            f"({'ต่ำกว่าเกณฑ์' if is_dementia else 'อยู่ในเกณฑ์ปกติ'})"
-        )
-
         st.divider()
 
-        # ── Per-Domain ──
         st.subheader("📋 คะแนนรายด้าน")
-
-        score_colors = {
-            0: "🔴", 1: "🟡", 2: "🟢"
-        }
-        score_labels = {
-            0: "ต้องปรับปรุง (0/2)",
-            1: "พอใช้ (1/2)",
-            2: "ดี (2/2)",
+        colors = {0:"🔴", 1:"🟡", 2:"🟢"}
+        models_used = {
+            0:"07l", 1:"07l",
+            2:"07r", 3:"07r", 4:"07r"
         }
 
         for i, (domain, score) in enumerate(
             zip(domain_names, scores)
         ):
-            col1, col2 = st.columns([4, 1])
+            col1, col2 = st.columns([4,1])
             with col1:
                 st.write(f"**{domain}**")
                 st.caption(domain_desc[domain])
@@ -305,7 +365,7 @@ if img is not None:
                 st.markdown(
                     f"<div style='text-align:center;"
                     f"font-size:2em'>"
-                    f"{score_colors[score]}</div>"
+                    f"{colors[score]}</div>"
                     f"<div style='text-align:center'>"
                     f"{score}/2</div>",
                     unsafe_allow_html=True
@@ -313,50 +373,38 @@ if img is not None:
 
         st.divider()
 
-        # ── Interpretation ──
-        st.subheader("📖 การแปลผล")
         if total >= 8:
-            st.success(
-                "**คะแนนดีมาก** "
-                "ไม่พบสัญญาณเสี่ยงใน CDT นี้"
-            )
+            st.success("**คะแนนดีมาก** ไม่พบสัญญาณเสี่ยง")
         elif total >= 6:
-            st.info(
-                "**คะแนนปกติ** "
-                "แนะนำติดตามอาการต่อเนื่อง"
-            )
+            st.info("**คะแนนปกติ** แนะนำติดตามต่อเนื่อง")
         elif total >= 4:
-            st.warning(
-                "**คะแนนต่ำกว่าเกณฑ์** "
-                "แนะนำพบแพทย์เพื่อตรวจเพิ่มเติม"
-            )
+            st.warning("**ต่ำกว่าเกณฑ์** ควรพบแพทย์")
         else:
-            st.error(
-                "**คะแนนต่ำมาก** "
-                "ควรพบแพทย์ผู้เชี่ยวชาญโดยเร็ว"
-            )
+            st.error("**คะแนนต่ำมาก** ควรพบแพทย์โดยด่วน")
 
-        st.divider()
         st.caption(
-            "Model: ViT + Focal Loss | "
-            "AUC = 0.893 | Sensitivity = 0.884 | "
-            "Train on NHATS Round 14"
+            "Domain-wise Ensemble "
+            "(07l + 07r) | AUC=0.901"
         )
 
-# ── Sidebar ──
 with st.sidebar:
     st.header("ℹ️ เกี่ยวกับระบบ")
     st.markdown("""
     **CDT Dementia Screening**
 
     วิเคราะห์ Clock Drawing Test
-    ด้วย Deep Learning (ViT)
+    ด้วย Domain-wise Ensemble
 
     ---
     **Model Performance:**
-    - AUC: 0.893
-    - Sensitivity: 0.884
-    - Specificity: 0.701
+    - AUC: 0.901
+    - Sensitivity: 0.871
+    - Specificity: 0.754
+
+    ---
+    **Domain Selection:**
+    - A, B → Hybrid VQA (07l)
+    - C, D, E → Focal Loss (07r)
 
     ---
     **CCSS Domains:**
@@ -367,17 +415,6 @@ with st.sidebar:
     - E: ตำแหน่งเข็ม
 
     **Cutoff:** < 6/10 = เสี่ยง
-
-    ---
-    **Dataset:**
-    NHATS Round 14
-    6,602 รูป
-
-    ---
     """)
-    st.warning(
-        "ใช้เพื่อ screening เท่านั้น"
-    )
-    st.caption(
-        "Built for AI Builders 2026"
-    )
+    st.warning("ใช้เพื่อ screening เท่านั้น")
+    st.caption("Built for AI Builders 2026")
