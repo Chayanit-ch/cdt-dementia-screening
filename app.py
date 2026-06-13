@@ -87,7 +87,7 @@ class CDTModel(nn.Module):
 
 class CDTHybridModel(nn.Module):
     def __init__(self, backbone_name="vit",
-                 vqa_dim=12, num_domains=5):
+                 vqa_dim=14, num_domains=5):
         super().__init__()
         if backbone_name == "vit":
             self.backbone = timm.create_model(
@@ -171,7 +171,7 @@ def load_models():
             )
 
     model_07l = CDTHybridModel(
-        backbone_name="vit", vqa_dim=12
+        backbone_name="vit", vqa_dim=14
     ).to(device)
     model_07l.load_state_dict(
         torch.load("model_07l.pth",
