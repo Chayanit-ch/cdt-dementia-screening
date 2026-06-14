@@ -45,39 +45,68 @@ Total Score → if < 6 → Dementia Risk
 ## 📁 Structure
 cdt-dementia-screening/
 
-├── app.py                  ← Streamlit app
+├── app.py                            ← Streamlit web app
 
-├── requirements.txt
+├── requirements.txt                  ← Python dependencies
 
 ├── src/
 
-│   ├── models.py           ← CDTModel, CDTHybridModel
+│   ├── models.py                     ← CDTModel, CDTHybridModel
 
-│   └── features.py         ← VQA feature functions
+│   └── features.py                   ← VQA feature functions
+
+├── results/
+
+│   ├── 08_roc_curve.png
+
+│   ├── 08_model_comparison.png
+
+│   ├── 08_distribution_all.png
+
+│   ├── 08_domain_accuracy_heatmap.png
+
+│   ├── 08_final_summary.json
+
+│   └── eda_*.png
 
 └── notebooks/
 
-├── 07j_human_labels.ipynb
+├── 01_labeling_v1.ipynb          ← LLM labeling
 
-├── 07k_undersample.ipynb
+├── 02_prompt_test.ipynb          ← ทดสอบ prompt
 
-├── 07l_vqa_features.ipynb
+├── 03_check.ipynb                ← ตรวจสอบ labels
 
-├── 07m_hand_features.ipynb
+├── 04_EDA.ipynb                  ← EDA
 
-├── 07n_downsample_train.ipynb
+├── 05_data_prep.ipynb            ← เตรียมข้อมูล
 
-├── 07o_binary_label.ipynb
+├── 06b_baseline_llm_human.ipynb  ← LLM + human labels
 
-├── 07p_generate_images.ipynb
+├── human_review_tool.ipynb       ← Human review interface
 
-├── 07q_finetune_sd.ipynb
+├── 07j_human_labels.ipynb        ← Human label review
 
-├── 07r_focal_loss.ipynb
+├── 07k_undersample.ipynb         ← Undersample + ViT baseline
 
-├── 07s_improved_features.ipynb
+├── 07l_vqa_features.ipynb        ← Hybrid VQA features
 
-└── 08_evaluation.ipynb
+├── 07m_hand_features.ipynb       ← Hybrid + Hand features
+
+├── 07n_downsample_train.ipynb    ← Downsample class 2
+
+├── 07o_binary_label.ipynb        ← Binary label experiment
+
+├── 07p_generate_images.ipynb     ← SD Inpainting (failed)
+
+├── 07q_finetune_sd.ipynb         ← LoRA Fine-tune (failed)
+
+├── 07r_focal_loss.ipynb          ← Focal Loss
+
+├── 07s_improved_features.ipynb   ← Improved VQA features v2
+
+└── 08_evaluation.ipynb           ← Final evaluation
+
 
 ## Setup
 
