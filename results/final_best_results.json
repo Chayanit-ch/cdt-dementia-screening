@@ -1,0 +1,24 @@
+{
+  "07k_ViT_REG": {
+    "sens": 0.751,
+    "spec": 0.844,
+    "auc": 0.882
+  },
+  "07l_Hybrid_VQA": {
+    "sens": 0.76,
+    "spec": 0.85,
+    "auc": 0.887
+  },
+  "07r_Focal": {
+    "sens": 0.884,
+    "spec": 0.701,
+    "auc": 0.893
+  },
+  "Domain_wise": {
+    "sens": 0.871,
+    "spec": 0.754,
+    "auc": 0.901
+  },
+  "selection": "A=07l B=07l C=07r D=07r E=07r",
+  "selected_on": "val set"
+}
