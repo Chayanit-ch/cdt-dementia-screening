@@ -21,8 +21,6 @@ Request access: [nhats.org](https://www.nhats.org/data-access/nhats)
 | Hybrid VQA | 0.760 | 0.850 | 0.887 |
 | **Focal Loss (Best)** | **0.884** | **0.701** | **0.893** |
 
-Target: Sensitivity ≥ 0.88, Specificity ≥ 0.82, AUC ≥ 0.91
-
 ## 🏗️ Architecture
 Input Image (224×224)
 
