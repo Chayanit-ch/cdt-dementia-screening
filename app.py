@@ -18,7 +18,7 @@ st.set_page_config(
 
 # ── Constants ──
 CUTOFF    = 6
-MODEL_URL = "https://drive.google.com/uc?id=YOUR_FILE_ID"
+MODEL_URL = "https://drive.google.com/uc?id=1cTh__P48xT8DE0TY6au0I_-kjwyAVyMI"
 
 domain_names = [
     "A: Digit Count",
@@ -237,7 +237,7 @@ if img is not None:
     st.divider()
 
     if st.button(
-        "🔍 วิเคราะห์", type="primary",
+        "วิเคราะห์", type="primary",
         use_container_width=True
     ):
         with st.spinner("กำลังวิเคราะห์รูป..."):
