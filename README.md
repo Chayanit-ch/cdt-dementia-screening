@@ -12,6 +12,10 @@ for dementia screening using CCSS scoring standard.
 NHATS Round 14 — not included
 Request access: [nhats.org](https://www.nhats.org/data-access/nhats)
 
+## Medium Post
+Request access: [medium]([https://www.nhats.org/data-access/nhats](https://medium.com/@baitoey8344/assessing-dementia-risk-by-clock-drawing-test-based-on-the-ccss-scoring-system-using-deep-learning-10328adc8a57?sharedUserId=baitoey8344
+))
+
 ## 📊 Results
 
 | Model | Sensitivity | Specificity | AUC |
