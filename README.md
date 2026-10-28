@@ -5,16 +5,14 @@ for dementia screening using CCSS scoring standard.
 
 ## 🌐 Demo
 
-[![Streamlit App]](https://cdt-dementia-screening-as7vhbgavmfsmc9np9o5r7.streamlit.app/)
-
+[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://cdt-dementia-screening-as7vhbgavmfsmc9np9o5r7.streamlit.app/)
 
 ## Dataset
 NHATS Round 14 — not included
 Request access: [nhats.org](https://www.nhats.org/data-access/nhats)
 
 ## Medium Post
-Request access: [medium]([https://www.nhats.org/data-access/nhats](https://medium.com/@baitoey8344/assessing-dementia-risk-by-clock-drawing-test-based-on-the-ccss-scoring-system-using-deep-learning-10328adc8a57?sharedUserId=baitoey8344
-))
+Read more: [Assessing Dementia Risk by Clock Drawing Test Based on the CCSS Scoring System Using Deep Learning](https://medium.com/@baitoey8344/assessing-dementia-risk-by-clock-drawing-test-based-on-the-ccss-scoring-system-using-deep-learning-10328adc8a57?sharedUserId=baitoey8344)
 
 ## 📊 Results
 
@@ -26,89 +24,53 @@ Request access: [medium]([https://www.nhats.org/data-access/nhats](https://mediu
 | **Focal Loss (Best)** | **0.884** | **0.701** | **0.893** |
 
 ## 🏗️ Architecture
+```
 Input Image (224×224)
-
-↓
-
+        ↓
 ViT Backbone (Frozen)
-
-↓
-
+        ↓
 Shared Layer (512 dims)
-
-↓
-
+        ↓
 5 Domain Heads (A/B/C/D/E)
-
-↓
-
+        ↓
 Total Score → if < 6 → Dementia Risk
+```
 
 ## 📁 Structure
+```
 cdt-dementia-screening/
-
 ├── app.py                            ← Streamlit web app
-
 ├── requirements.txt                  ← Python dependencies
-
 ├── src/
-
 │   ├── models.py                     ← CDTModel, CDTHybridModel
-
 │   └── features.py                   ← VQA feature functions
-
 ├── results/
-
 │   ├── 08_roc_curve.png
-
 │   ├── 08_model_comparison.png
-
 │   ├── 08_distribution_all.png
-
 │   ├── 08_domain_accuracy_heatmap.png
-
 │   ├── 08_final_summary.json
-
 │   └── eda_*.png
-
 └── notebooks/
-
-├── 01_labeling_v1.ipynb          ← LLM labeling
-
-├── 02_prompt_test.ipynb          ← ทดสอบ prompt
-
-├── 03_check.ipynb                ← ตรวจสอบ labels
-
-├── 04_EDA.ipynb                  ← EDA
-
-├── 05_data_prep.ipynb            ← เตรียมข้อมูล
-
-├── 06b_baseline_llm_human.ipynb  ← LLM + human labels
-
-├── human_review_tool.ipynb       ← Human review interface
-
-├── 07j_human_labels.ipynb        ← Human label review
-
-├── 07k_undersample.ipynb         ← Undersample + ViT baseline
-
-├── 07l_vqa_features.ipynb        ← Hybrid VQA features
-
-├── 07m_hand_features.ipynb       ← Hybrid + Hand features
-
-├── 07n_downsample_train.ipynb    ← Downsample class 2
-
-├── 07o_binary_label.ipynb        ← Binary label experiment
-
-├── 07p_generate_images.ipynb     ← SD Inpainting (failed)
-
-├── 07q_finetune_sd.ipynb         ← LoRA Fine-tune (failed)
-
-├── 07r_focal_loss.ipynb          ← Focal Loss
-
-├── 07s_improved_features.ipynb   ← Improved VQA features v2
-
-└── 08_evaluation.ipynb           ← Final evaluation
-
+    ├── 01_labeling_v1.ipynb          ← LLM labeling
+    ├── 02_prompt_test.ipynb          ← ทดสอบ prompt
+    ├── 03_check.ipynb                ← ตรวจสอบ labels
+    ├── 04_EDA.ipynb                  ← EDA
+    ├── 05_data_prep.ipynb            ← เตรียมข้อมูล
+    ├── 06b_baseline_llm_human.ipynb  ← LLM + human labels
+    ├── human_review_tool.ipynb       ← Human review interface
+    ├── 07j_human_labels.ipynb        ← Human label review
+    ├── 07k_undersample.ipynb         ← Undersample + ViT baseline
+    ├── 07l_vqa_features.ipynb        ← Hybrid VQA features
+    ├── 07m_hand_features.ipynb       ← Hybrid + Hand features
+    ├── 07n_downsample_train.ipynb    ← Downsample class 2
+    ├── 07o_binary_label.ipynb        ← Binary label experiment
+    ├── 07p_generate_images.ipynb     ← SD Inpainting (failed)
+    ├── 07q_finetune_sd.ipynb         ← LoRA Fine-tune (failed)
+    ├── 07r_focal_loss.ipynb          ← Focal Loss
+    ├── 07s_improved_features.ipynb   ← Improved VQA features v2
+    └── 08_evaluation.ipynb           ← Final evaluation
+```
 
 ## Setup
 
